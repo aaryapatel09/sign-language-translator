@@ -405,8 +405,9 @@
                         body: formData
                     });
 
+                    const data = await response.json();
+
                     if (response.ok) {
-                        const data = await response.json();
                         if (data.sign !== '-') {
                             result.textContent = data.sign;
                             status.textContent = `Detected sign: ${data.sign}`;
@@ -420,14 +421,21 @@
                             status.textContent = 'No sign detected. Try adjusting your hand position.';
                         }
                     } else {
-                        const errorData = await response.json();
-                        status.textContent = `Error: ${errorData.error || 'Unknown error'}`;
+                        result.textContent = '-';
+                        status.textContent = `Error: ${data.error || 'Unknown error'}`;
                         status.classList.add('error');
+                        console.error('Server error:', data.error);
                     }
                 } catch (err) {
                     console.error('Error processing frame:', err);
-                    status.textContent = 'Error processing frame. Please try again.';
+                    result.textContent = '-';
+                    status.textContent = `Error: ${err.message || 'Failed to process frame. Please check if the server is running.'}`;
                     status.classList.add('error');
+                    
+                    // If we get a network error, it might mean the server is down
+                    if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
+                        status.textContent = 'Error: Cannot connect to server. Please make sure the Flask server is running.';
+                    }
                 }
 
                 requestAnimationFrame(processFrame);

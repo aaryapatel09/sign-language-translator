@@ -5,9 +5,13 @@ import numpy as np
 import mediapipe as mp
 import math
 import logging
+import traceback
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+# Set up logging with more detail
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
@@ -24,50 +28,60 @@ hands = mp_hands.Hands(
 
 # Define basic ASL gestures based on finger states
 def get_finger_states(hand_landmarks):
-    # Get y coordinates of finger tips and middle joints
-    thumb_tip = hand_landmarks.landmark[4].y
-    thumb_ip = hand_landmarks.landmark[3].y
-    index_tip = hand_landmarks.landmark[8].y
-    index_pip = hand_landmarks.landmark[6].y
-    middle_tip = hand_landmarks.landmark[12].y
-    middle_pip = hand_landmarks.landmark[10].y
-    ring_tip = hand_landmarks.landmark[16].y
-    ring_pip = hand_landmarks.landmark[14].y
-    pinky_tip = hand_landmarks.landmark[20].y
-    pinky_pip = hand_landmarks.landmark[18].y
+    try:
+        # Get y coordinates of finger tips and middle joints
+        thumb_tip = hand_landmarks.landmark[4].y
+        thumb_ip = hand_landmarks.landmark[3].y
+        index_tip = hand_landmarks.landmark[8].y
+        index_pip = hand_landmarks.landmark[6].y
+        middle_tip = hand_landmarks.landmark[12].y
+        middle_pip = hand_landmarks.landmark[10].y
+        ring_tip = hand_landmarks.landmark[16].y
+        ring_pip = hand_landmarks.landmark[14].y
+        pinky_tip = hand_landmarks.landmark[20].y
+        pinky_pip = hand_landmarks.landmark[18].y
 
-    # Check if each finger is extended (tip is higher than pip)
-    thumb_up = thumb_tip < thumb_ip
-    index_up = index_tip < index_pip
-    middle_up = middle_tip < middle_pip
-    ring_up = ring_tip < ring_pip
-    pinky_up = pinky_tip < pinky_pip
+        # Check if each finger is extended (tip is higher than pip)
+        thumb_up = thumb_tip < thumb_ip
+        index_up = index_tip < index_pip
+        middle_up = middle_tip < middle_pip
+        ring_up = ring_tip < ring_pip
+        pinky_up = pinky_tip < pinky_pip
 
-    finger_states = [thumb_up, index_up, middle_up, ring_up, pinky_up]
-    logger.info(f"Finger states: {finger_states}")
-    return finger_states
+        finger_states = [thumb_up, index_up, middle_up, ring_up, pinky_up]
+        logger.info(f"Finger states: {finger_states}")
+        return finger_states
+    except Exception as e:
+        logger.error(f"Error in get_finger_states: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise
 
 def detect_asl_sign(finger_states):
-    # Basic ASL letter detection based on finger states
-    if finger_states == [False, True, False, False, False]:
-        return "D"
-    elif finger_states == [False, True, True, False, False]:
-        return "V"
-    elif finger_states == [False, True, True, True, False]:
-        return "W"
-    elif finger_states == [True, True, False, False, False]:
-        return "L"
-    elif finger_states == [False, True, True, True, True]:
-        return "B"
-    elif finger_states == [True, False, False, False, True]:
-        return "Y"
-    elif all(finger_states):
-        return "5"
-    elif not any(finger_states):
-        return "A"
-    elif finger_states == [False, True, False, False, True]:
-        return "I"
-    return None
+    try:
+        # Basic ASL letter detection based on finger states
+        if finger_states == [False, True, False, False, False]:
+            return "D"
+        elif finger_states == [False, True, True, False, False]:
+            return "V"
+        elif finger_states == [False, True, True, True, False]:
+            return "W"
+        elif finger_states == [True, True, False, False, False]:
+            return "L"
+        elif finger_states == [False, True, True, True, True]:
+            return "B"
+        elif finger_states == [True, False, False, False, True]:
+            return "Y"
+        elif all(finger_states):
+            return "5"
+        elif not any(finger_states):
+            return "A"
+        elif finger_states == [False, True, False, False, True]:
+            return "I"
+        return None
+    except Exception as e:
+        logger.error(f"Error in detect_asl_sign: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise
 
 @app.route('/')
 def index():
@@ -83,12 +97,16 @@ def process_frame():
         # Read the image from the request
         file = request.files['image']
         image_bytes = file.read()
+        logger.info(f"Received image of size: {len(image_bytes)} bytes")
+        
         nparr = np.frombuffer(image_bytes, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         if frame is None:
             logger.error("Failed to decode image")
             return jsonify({'error': 'Failed to decode image'}), 400
+
+        logger.info(f"Decoded image shape: {frame.shape}")
 
         # Convert the BGR image to RGB
         rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -114,6 +132,7 @@ def process_frame():
 
     except Exception as e:
         logger.error(f"Error processing frame: {str(e)}")
+        logger.error(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
