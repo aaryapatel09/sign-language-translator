@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Model files
+model/*.h5
+model/*.pkl
+model/*.model
+
+# OS
+.DS_Store
+Thumbs.db 
