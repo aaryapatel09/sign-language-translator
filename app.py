@@ -2,10 +2,10 @@ from flask import Flask, render_template, request, jsonify
 from flask_cors import CORS
 import cv2
 import numpy as np
-import mediapipe as mp
-import math
+import tensorflow as tf
 import logging
 import traceback
+import os
 
 # Set up logging with more detail
 logging.basicConfig(
@@ -17,71 +17,32 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 
-# Initialize MediaPipe
-mp_hands = mp.solutions.hands
-hands = mp_hands.Hands(
-    static_image_mode=False,
-    max_num_hands=1,
-    min_detection_confidence=0.7,
-    min_tracking_confidence=0.5
-)
+# Load the trained model and class names
+model_path = 'model/asl_model.h5'
+class_names_path = 'model/class_names.npy'
 
-# Define basic ASL gestures based on finger states
-def get_finger_states(hand_landmarks):
-    try:
-        # Get y coordinates of finger tips and middle joints
-        thumb_tip = hand_landmarks.landmark[4].y
-        thumb_ip = hand_landmarks.landmark[3].y
-        index_tip = hand_landmarks.landmark[8].y
-        index_pip = hand_landmarks.landmark[6].y
-        middle_tip = hand_landmarks.landmark[12].y
-        middle_pip = hand_landmarks.landmark[10].y
-        ring_tip = hand_landmarks.landmark[16].y
-        ring_pip = hand_landmarks.landmark[14].y
-        pinky_tip = hand_landmarks.landmark[20].y
-        pinky_pip = hand_landmarks.landmark[18].y
+if not os.path.exists(model_path) or not os.path.exists(class_names_path):
+    logger.error("Model files not found. Please train the model first.")
+    raise FileNotFoundError("Model files not found. Please train the model first.")
 
-        # Check if each finger is extended (tip is higher than pip)
-        thumb_up = thumb_tip < thumb_ip
-        index_up = index_tip < index_pip
-        middle_up = middle_tip < middle_pip
-        ring_up = ring_tip < ring_pip
-        pinky_up = pinky_tip < pinky_pip
+model = tf.keras.models.load_model(model_path)
+class_names = np.load(class_names_path)
+logger.info(f"Loaded model with {len(class_names)} classes")
 
-        finger_states = [thumb_up, index_up, middle_up, ring_up, pinky_up]
-        logger.info(f"Finger states: {finger_states}")
-        return finger_states
-    except Exception as e:
-        logger.error(f"Error in get_finger_states: {str(e)}")
-        logger.error(traceback.format_exc())
-        raise
-
-def detect_asl_sign(finger_states):
-    try:
-        # Basic ASL letter detection based on finger states
-        if finger_states == [False, True, False, False, False]:
-            return "D"
-        elif finger_states == [False, True, True, False, False]:
-            return "V"
-        elif finger_states == [False, True, True, True, False]:
-            return "W"
-        elif finger_states == [True, True, False, False, False]:
-            return "L"
-        elif finger_states == [False, True, True, True, True]:
-            return "B"
-        elif finger_states == [True, False, False, False, True]:
-            return "Y"
-        elif all(finger_states):
-            return "5"
-        elif not any(finger_states):
-            return "A"
-        elif finger_states == [False, True, False, False, True]:
-            return "I"
-        return None
-    except Exception as e:
-        logger.error(f"Error in detect_asl_sign: {str(e)}")
-        logger.error(traceback.format_exc())
-        raise
+def preprocess_image(image):
+    """Preprocess the image for model input."""
+    # Resize to 64x64
+    image = cv2.resize(image, (64, 64))
+    # Convert to RGB if needed
+    if len(image.shape) == 2:
+        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+    elif image.shape[2] == 4:
+        image = cv2.cvtColor(image, cv2.COLOR_BGRA2RGB)
+    # Normalize
+    image = image / 255.0
+    # Add batch dimension
+    image = np.expand_dims(image, axis=0)
+    return image
 
 @app.route('/')
 def index():
@@ -108,27 +69,21 @@ def process_frame():
 
         logger.info(f"Decoded image shape: {frame.shape}")
 
-        # Convert the BGR image to RGB
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # Preprocess the image
+        processed_image = preprocess_image(frame)
         
-        # Process the frame and detect hands
-        results = hands.process(rgb_frame)
+        # Make prediction
+        predictions = model.predict(processed_image)
+        predicted_class = np.argmax(predictions[0])
+        confidence = float(predictions[0][predicted_class])
         
-        if results.multi_hand_landmarks:
-            logger.info("Hand detected in frame")
-            hand_landmarks = results.multi_hand_landmarks[0]  # Get the first hand
-            finger_states = get_finger_states(hand_landmarks)
-            detected_sign = detect_asl_sign(finger_states)
-            
-            if detected_sign:
-                logger.info(f"Detected sign: {detected_sign}")
-                return jsonify({'sign': detected_sign})
-            else:
-                logger.info("No matching sign detected")
+        if confidence > 0.7:  # Confidence threshold
+            detected_sign = class_names[predicted_class]
+            logger.info(f"Detected sign: {detected_sign} with confidence: {confidence:.2f}")
+            return jsonify({'sign': detected_sign})
         else:
-            logger.info("No hand detected in frame")
-        
-        return jsonify({'sign': '-'})
+            logger.info(f"No confident sign detected. Best match: {class_names[predicted_class]} with confidence: {confidence:.2f}")
+            return jsonify({'sign': '-'})
 
     except Exception as e:
         logger.error(f"Error processing frame: {str(e)}")
