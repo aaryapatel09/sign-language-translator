@@ -193,6 +193,55 @@
             50% { opacity: 1; transform: scale(1.2); }
             100% { opacity: 0; transform: scale(0.5); }
         }
+
+        #canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+        }
+
+        .detection-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .hand-position-guide {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+
+        .guide-box {
+            width: 200px;
+            height: 200px;
+            border: 3px dashed var(--primary-color);
+            border-radius: 20px;
+            opacity: 0.5;
+            animation: pulse 2s infinite;
+        }
+
+        .hand-position-guide p {
+            margin-top: 10px;
+            color: var(--primary-color);
+            font-weight: 600;
+            text-shadow: 0 0 10px white;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.05); opacity: 0.7; }
+            100% { transform: scale(1); opacity: 0.5; }
+        }
     </style>
 </head>
 <body>
@@ -208,7 +257,13 @@
                     <div class="card-body">
                         <div class="video-container mb-4">
                             <video id="video" autoplay playsinline></video>
-                            <canvas id="canvas" style="display: none;"></canvas>
+                            <canvas id="canvas"></canvas>
+                            <div class="detection-overlay">
+                                <div class="hand-position-guide">
+                                    <div class="guide-box"></div>
+                                    <p>Position your hand here</p>
+                                </div>
+                            </div>
                         </div>
                         
                         <div class="result-container text-center">
@@ -296,7 +351,24 @@
                 const context = canvas.getContext('2d');
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
+                
+                // Draw the video frame
                 context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                // Add some visual effects
+                context.strokeStyle = '#FF69B4';
+                context.lineWidth = 3;
+                context.fillStyle = 'rgba(255, 105, 180, 0.2)';
+                
+                // Draw a detection area
+                const centerX = canvas.width / 2;
+                const centerY = canvas.height / 2;
+                const size = Math.min(canvas.width, canvas.height) * 0.6;
+                
+                context.beginPath();
+                context.roundRect(centerX - size/2, centerY - size/2, size, size, 20);
+                context.stroke();
+                context.fill();
 
                 try {
                     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
@@ -310,7 +382,16 @@
 
                     if (response.ok) {
                         const data = await response.json();
-                        result.textContent = data.sign || '-';
+                        if (data.sign !== '-') {
+                            result.textContent = data.sign;
+                            // Add sparkle animation when sign is detected
+                            result.classList.add('animate__animated', 'animate__rubberBand');
+                            setTimeout(() => {
+                                result.classList.remove('animate__animated', 'animate__rubberBand');
+                            }, 1000);
+                        } else {
+                            result.textContent = '-';
+                        }
                     }
                 } catch (err) {
                     console.error('Error processing frame:', err);
