@@ -1,44 +1,83 @@
-# Real-Time Sign Language Translator
+# Sign Language Translator
 
-This application translates American Sign Language (ASL) gestures into text and speech in real-time using your computer's webcam.
+A real-time American Sign Language (ASL) translator that uses computer vision to detect and translate hand gestures into text.
 
 ## Features
 
-- Real-time ASL gesture recognition using webcam
-- Text output of recognized signs
-- Text-to-speech conversion of recognized signs
-- Support for basic ASL alphabet and common words
+- Real-time hand gesture detection using MediaPipe
+- Support for basic ASL letters (A, B, D, I, L, V, W, Y, 5)
+- Live camera feed with visual feedback
+- User-friendly web interface
+- Detailed error handling and logging
 
-## Requirements
+## Prerequisites
 
-- Python 3.8 or higher
-- Webcam
-- Required Python packages (listed in requirements.txt)
+- Python 3.7+
+- OpenCV
+- MediaPipe
+- Flask
+- Modern web browser with camera access
 
 ## Installation
 
-1. Clone this repository
-2. Create a virtual environment (recommended):
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+1. Clone the repository:
+```bash
+git clone https://github.com/aaryapatel09/sign-language-translator.git
+cd sign-language-translator
+```
+
+2. Create and activate a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows, use: venv\Scripts\activate
+```
+
 3. Install the required packages:
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+pip install -r requirements.txt
+```
 
 ## Usage
 
-Run the application:
+1. Start the Flask server:
 ```bash
-python main.py
+python app.py
 ```
 
-- Press 'q' to quit the application
-- Make sure your hand is clearly visible in the camera frame
-- Perform ASL signs in front of the camera
+2. Open `index.html` in your web browser
 
-## Note
+3. Click "Start Camera" and allow camera access when prompted
 
-This is a basic implementation that recognizes ASL alphabet signs. The accuracy depends on lighting conditions and camera quality. 
+4. Position your hand in the guide box and make ASL signs
+
+5. The detected sign will appear on screen
+
+## Supported Signs
+
+Currently supports the following ASL letters:
+- A (closed fist)
+- B (all fingers up)
+- D (index finger up)
+- I (index and pinky up)
+- L (thumb and index finger up)
+- V (index and middle fingers up)
+- W (index, middle, and ring fingers up)
+- Y (thumb and pinky up)
+- 5 (all fingers up)
+
+## Troubleshooting
+
+If you encounter any issues:
+1. Make sure the Flask server is running
+2. Check that your camera is working and accessible
+3. Ensure you're using a modern browser
+4. Look for error messages in the browser console (F12)
+5. Check the Flask server logs for detailed error information
+
+## Contributing
+
+Feel free to submit issues and enhancement requests!
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details. 
