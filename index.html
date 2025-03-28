@@ -242,6 +242,21 @@
             50% { transform: scale(1.05); opacity: 0.7; }
             100% { transform: scale(1); opacity: 0.5; }
         }
+
+        .status-text {
+            font-size: 1.1em;
+            color: var(--text-color);
+            font-weight: 600;
+            min-height: 1.5em;
+        }
+
+        .status-text.detecting {
+            color: var(--primary-color);
+        }
+
+        .status-text.error {
+            color: #FF6B6B;
+        }
     </style>
 </head>
 <body>
@@ -268,6 +283,7 @@
                         
                         <div class="result-container text-center">
                             <h3>Detected Sign: <span id="result" class="sparkle">-</span></h3>
+                            <div id="status" class="status-text mb-3">Waiting to start...</div>
                             <div class="controls">
                                 <button id="startBtn" class="btn btn-primary animate__animated animate__pulse animate__infinite">Start Camera ✨</button>
                                 <button id="stopBtn" class="btn btn-danger" disabled>Stop Camera 🌟</button>
@@ -303,11 +319,13 @@
             const result = document.getElementById('result');
             const startBtn = document.getElementById('startBtn');
             const stopBtn = document.getElementById('stopBtn');
+            const status = document.getElementById('status');
             let stream = null;
             let isProcessing = false;
 
             startBtn.addEventListener('click', async () => {
                 try {
+                    status.textContent = 'Starting camera...';
                     stream = await navigator.mediaDevices.getUserMedia({ 
                         video: { 
                             width: 640,
@@ -319,6 +337,7 @@
                     startBtn.disabled = true;
                     stopBtn.disabled = false;
                     isProcessing = true;
+                    status.textContent = 'Camera started. Position your hand in the guide box.';
                     processFrame();
                     
                     // Add animation classes
@@ -326,6 +345,8 @@
                     stopBtn.classList.add('animate__pulse');
                 } catch (err) {
                     console.error('Error accessing camera:', err);
+                    status.textContent = 'Error accessing camera. Please check permissions.';
+                    status.classList.add('error');
                     alert('Error accessing camera. Please make sure you have granted camera permissions.');
                 }
             });
@@ -338,6 +359,7 @@
                     stopBtn.disabled = true;
                     isProcessing = false;
                     result.textContent = '-';
+                    status.textContent = 'Camera stopped';
                     
                     // Reset animation classes
                     startBtn.classList.add('animate__pulse');
@@ -375,6 +397,9 @@
                     const formData = new FormData();
                     formData.append('image', blob);
 
+                    status.textContent = 'Processing hand detection...';
+                    status.classList.add('detecting');
+
                     const response = await fetch('http://localhost:5000/process_frame', {
                         method: 'POST',
                         body: formData
@@ -384,6 +409,7 @@
                         const data = await response.json();
                         if (data.sign !== '-') {
                             result.textContent = data.sign;
+                            status.textContent = `Detected sign: ${data.sign}`;
                             // Add sparkle animation when sign is detected
                             result.classList.add('animate__animated', 'animate__rubberBand');
                             setTimeout(() => {
@@ -391,10 +417,17 @@
                             }, 1000);
                         } else {
                             result.textContent = '-';
+                            status.textContent = 'No sign detected. Try adjusting your hand position.';
                         }
+                    } else {
+                        const errorData = await response.json();
+                        status.textContent = `Error: ${errorData.error || 'Unknown error'}`;
+                        status.classList.add('error');
                     }
                 } catch (err) {
                     console.error('Error processing frame:', err);
+                    status.textContent = 'Error processing frame. Please try again.';
+                    status.classList.add('error');
                 }
 
                 requestAnimationFrame(processFrame);

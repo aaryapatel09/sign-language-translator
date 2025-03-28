@@ -3,37 +3,71 @@ from flask_cors import CORS
 import cv2
 import numpy as np
 import mediapipe as mp
-from tensorflow.keras.models import load_model
-import io
+import math
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)
 
 # Initialize MediaPipe
 mp_hands = mp.solutions.hands
-hands = mp_hands.Hands(max_num_hands=1, min_detection_confidence=0.7, min_tracking_confidence=0.5)
-mp_draw = mp.solutions.drawing_utils
+hands = mp_hands.Hands(
+    static_image_mode=False,
+    max_num_hands=1,
+    min_detection_confidence=0.7,
+    min_tracking_confidence=0.5
+)
 
-# Load the model
-try:
-    model = load_model('model/asl_model.h5')
-except:
-    print("Warning: Model file not found. Please train the model first.")
-    model = None
+# Define basic ASL gestures based on finger states
+def get_finger_states(hand_landmarks):
+    # Get y coordinates of finger tips and middle joints
+    thumb_tip = hand_landmarks.landmark[4].y
+    thumb_ip = hand_landmarks.landmark[3].y
+    index_tip = hand_landmarks.landmark[8].y
+    index_pip = hand_landmarks.landmark[6].y
+    middle_tip = hand_landmarks.landmark[12].y
+    middle_pip = hand_landmarks.landmark[10].y
+    ring_tip = hand_landmarks.landmark[16].y
+    ring_pip = hand_landmarks.landmark[14].y
+    pinky_tip = hand_landmarks.landmark[20].y
+    pinky_pip = hand_landmarks.landmark[18].y
 
-# ASL alphabet mapping
-ASL_ALPHABET = {
-    0: 'A', 1: 'B', 2: 'C', 3: 'D', 4: 'E', 5: 'F', 6: 'G', 7: 'H', 8: 'I', 9: 'J',
-    10: 'K', 11: 'L', 12: 'M', 13: 'N', 14: 'O', 15: 'P', 16: 'Q', 17: 'R', 18: 'S',
-    19: 'T', 20: 'U', 21: 'V', 22: 'W', 23: 'X', 24: 'Y', 25: 'Z'
-}
+    # Check if each finger is extended (tip is higher than pip)
+    thumb_up = thumb_tip < thumb_ip
+    index_up = index_tip < index_pip
+    middle_up = middle_tip < middle_pip
+    ring_up = ring_tip < ring_pip
+    pinky_up = pinky_tip < pinky_pip
 
-def preprocess_landmarks(hand_landmarks):
-    """Convert hand landmarks to a format suitable for the model."""
-    landmarks = []
-    for landmark in hand_landmarks.landmark:
-        landmarks.extend([landmark.x, landmark.y, landmark.z])
-    return np.array(landmarks).reshape(1, -1)
+    finger_states = [thumb_up, index_up, middle_up, ring_up, pinky_up]
+    logger.info(f"Finger states: {finger_states}")
+    return finger_states
+
+def detect_asl_sign(finger_states):
+    # Basic ASL letter detection based on finger states
+    if finger_states == [False, True, False, False, False]:
+        return "D"
+    elif finger_states == [False, True, True, False, False]:
+        return "V"
+    elif finger_states == [False, True, True, True, False]:
+        return "W"
+    elif finger_states == [True, True, False, False, False]:
+        return "L"
+    elif finger_states == [False, True, True, True, True]:
+        return "B"
+    elif finger_states == [True, False, False, False, True]:
+        return "Y"
+    elif all(finger_states):
+        return "5"
+    elif not any(finger_states):
+        return "A"
+    elif finger_states == [False, True, False, False, True]:
+        return "I"
+    return None
 
 @app.route('/')
 def index():
@@ -42,32 +76,45 @@ def index():
 @app.route('/process_frame', methods=['POST'])
 def process_frame():
     if 'image' not in request.files:
+        logger.error("No image provided in request")
         return jsonify({'error': 'No image provided'}), 400
 
-    # Read the image from the request
-    file = request.files['image']
-    image_bytes = file.read()
-    nparr = np.frombuffer(image_bytes, np.uint8)
-    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    try:
+        # Read the image from the request
+        file = request.files['image']
+        image_bytes = file.read()
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-    # Convert the BGR image to RGB
-    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    
-    # Process the frame and detect hands
-    results = hands.process(rgb_frame)
-    
-    if results.multi_hand_landmarks and model is not None:
-        for hand_landmarks in results.multi_hand_landmarks:
-            # Preprocess landmarks and make prediction
-            landmarks = preprocess_landmarks(hand_landmarks)
-            prediction = model.predict(landmarks, verbose=0)
-            predicted_class = np.argmax(prediction[0])
+        if frame is None:
+            logger.error("Failed to decode image")
+            return jsonify({'error': 'Failed to decode image'}), 400
+
+        # Convert the BGR image to RGB
+        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        
+        # Process the frame and detect hands
+        results = hands.process(rgb_frame)
+        
+        if results.multi_hand_landmarks:
+            logger.info("Hand detected in frame")
+            hand_landmarks = results.multi_hand_landmarks[0]  # Get the first hand
+            finger_states = get_finger_states(hand_landmarks)
+            detected_sign = detect_asl_sign(finger_states)
             
-            # Get the predicted letter
-            predicted_letter = ASL_ALPHABET.get(predicted_class, 'Unknown')
-            return jsonify({'sign': predicted_letter})
-    
-    return jsonify({'sign': '-'})
+            if detected_sign:
+                logger.info(f"Detected sign: {detected_sign}")
+                return jsonify({'sign': detected_sign})
+            else:
+                logger.info("No matching sign detected")
+        else:
+            logger.info("No hand detected in frame")
+        
+        return jsonify({'sign': '-'})
+
+    except Exception as e:
+        logger.error(f"Error processing frame: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True) 
