@@ -11,12 +11,34 @@ body {
     background-color: #000;
     border-radius: 8px;
     overflow: hidden;
+    aspect-ratio: 4/3;
 }
 
 .video-container video {
     width: 100%;
-    height: auto;
+    height: 100%;
+    object-fit: cover;
     display: block;
+}
+
+.video-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    pointer-events: none;
+}
+
+.guide-box {
+    width: 300px;
+    height: 300px;
+    border: 3px solid rgba(255, 255, 255, 0.8);
+    border-radius: 8px;
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
 }
 
 .result-container {
@@ -35,6 +57,11 @@ body {
     transition: color 0.3s ease;
 }
 
+#status {
+    margin: 0.5rem 0 0 0;
+    font-size: 0.9rem;
+}
+
 .card {
     border: none;
     border-radius: 12px;
@@ -49,6 +76,21 @@ body {
 
 .alert ol {
     margin-bottom: 0;
+}
+
+#debug-info {
+    text-align: left;
+    margin-top: 2rem;
+}
+
+#debug-log {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    max-height: 200px;
+    overflow-y: auto;
+    margin: 0;
 }
 
 .controls {
@@ -69,6 +111,11 @@ body {
     
     #result {
         font-size: 3rem;
+    }
+    
+    .guide-box {
+        width: 200px;
+        height: 200px;
     }
     
     .controls {

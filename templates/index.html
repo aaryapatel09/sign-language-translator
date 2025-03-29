@@ -18,9 +18,13 @@
                     <div class="card-body">
                         <div class="video-container mb-3">
                             <video id="video" autoplay playsinline></video>
+                            <div class="video-overlay">
+                                <div class="guide-box"></div>
+                            </div>
                         </div>
                         <div class="result-container">
                             <h2 class="display-1" id="result">-</h2>
+                            <p class="text-muted" id="status">Initializing camera...</p>
                         </div>
                     </div>
                 </div>
@@ -29,16 +33,42 @@
                     <h5>Instructions:</h5>
                     <ol class="text-start">
                         <li>Allow camera access when prompted</li>
-                        <li>Position your hand in the camera view</li>
+                        <li>Position your hand in the guide box</li>
                         <li>Make ASL signs (A-Z)</li>
                         <li>The detected sign will appear above</li>
                     </ol>
+                </div>
+
+                <div class="alert alert-warning" id="debug-info" style="display: none;">
+                    <h5>Debug Information:</h5>
+                    <pre id="debug-log" class="text-start"></pre>
                 </div>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Override console.log to show debug information
+        const debugLog = document.getElementById('debug-log');
+        const debugInfo = document.getElementById('debug-info');
+        const originalConsoleLog = console.log;
+        const originalConsoleError = console.error;
+
+        console.log = function() {
+            debugInfo.style.display = 'block';
+            const message = Array.from(arguments).join(' ');
+            debugLog.textContent += message + '\n';
+            originalConsoleLog.apply(console, arguments);
+        };
+
+        console.error = function() {
+            debugInfo.style.display = 'block';
+            const message = Array.from(arguments).join(' ');
+            debugLog.textContent += 'ERROR: ' + message + '\n';
+            originalConsoleError.apply(console, arguments);
+        };
+    </script>
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html> 
