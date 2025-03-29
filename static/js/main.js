@@ -1,77 +1,78 @@
 document.addEventListener('DOMContentLoaded', function() {
     const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
     const result = document.getElementById('result');
-    const startBtn = document.getElementById('startBtn');
-    const stopBtn = document.getElementById('stopBtn');
     let stream = null;
-    let isProcessing = false;
+    let canvas = document.createElement('canvas');
+    let context = canvas.getContext('2d');
+
+    // Set canvas size
+    canvas.width = 640;
+    canvas.height = 480;
 
     // Start camera
-    startBtn.addEventListener('click', async () => {
+    async function startCamera() {
         try {
-            stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: {
                     width: 640,
                     height: 480,
                     facingMode: 'user'
-                } 
+                }
             });
             video.srcObject = stream;
-            startBtn.disabled = true;
-            stopBtn.disabled = false;
-            isProcessing = true;
+            video.play();
             processFrame();
         } catch (err) {
             console.error('Error accessing camera:', err);
-            alert('Error accessing camera. Please make sure you have granted camera permissions.');
+            result.textContent = 'Error: Camera access denied';
         }
-    });
+    }
 
-    // Stop camera
-    stopBtn.addEventListener('click', () => {
-        if (stream) {
-            stream.getTracks().forEach(track => track.stop());
-            video.srcObject = null;
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-            isProcessing = false;
-            result.textContent = '-';
-        }
-    });
-
-    // Process frames
+    // Process frame and send to server
     async function processFrame() {
-        if (!isProcessing) return;
+        if (!video.videoWidth) return;
 
-        const context = canvas.getContext('2d');
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        // Draw video frame to canvas
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-        try {
-            // Convert canvas to blob
-            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
-            
-            // Create form data
+        // Convert canvas to blob
+        canvas.toBlob(async (blob) => {
             const formData = new FormData();
-            formData.append('image', blob);
+            formData.append('image', blob, 'frame.jpg');
 
-            // Send to backend
-            const response = await fetch('/process_frame', {
-                method: 'POST',
-                body: formData
-            });
+            try {
+                const response = await fetch('/process_frame', {
+                    method: 'POST',
+                    body: formData
+                });
 
-            if (response.ok) {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
                 const data = await response.json();
-                result.textContent = data.sign || '-';
-            }
-        } catch (err) {
-            console.error('Error processing frame:', err);
-        }
+                if (data.error) {
+                    console.error('Server error:', data.error);
+                    return;
+                }
 
-        // Request next frame
-        requestAnimationFrame(processFrame);
+                result.textContent = data.sign;
+            } catch (err) {
+                console.error('Error processing frame:', err);
+            }
+
+            // Process next frame
+            requestAnimationFrame(processFrame);
+        }, 'image/jpeg', 0.8);
     }
+
+    // Clean up when page is unloaded
+    window.addEventListener('beforeunload', () => {
+        if (stream) {
+            stream.getTracks().forEach(track => track.stop());
+        }
+    });
+
+    // Start the application
+    startCamera();
 }); 

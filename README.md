@@ -1,22 +1,20 @@
-# Sign Language Translator
+# American Sign Language (ASL) Translator
 
-A real-time American Sign Language (ASL) translator that uses computer vision to detect and translate hand gestures into text.
+A real-time ASL translator that uses computer vision and deep learning to detect and translate American Sign Language signs into text.
 
 ## Features
 
-- Real-time hand gesture detection using MediaPipe
-- Support for basic ASL letters (A, B, D, I, L, V, W, Y, 5)
-- Live camera feed with visual feedback
+- Real-time sign language detection using webcam
+- Support for ASL alphabet (A-Z)
+- High accuracy with confidence threshold
 - User-friendly web interface
-- Detailed error handling and logging
+- Cross-platform compatibility
 
 ## Prerequisites
 
-- Python 3.7+
-- OpenCV
-- MediaPipe
-- Flask
-- Modern web browser with camera access
+- Python 3.9 or higher
+- Webcam
+- Modern web browser
 
 ## Installation
 
@@ -44,40 +42,49 @@ pip install -r requirements.txt
 python app.py
 ```
 
-2. Open `index.html` in your web browser
+2. Open your web browser and navigate to:
+```
+http://localhost:5001
+```
 
-3. Click "Start Camera" and allow camera access when prompted
+3. Allow camera access when prompted
+4. Show ASL signs to your webcam
+5. The detected sign will be displayed on the screen
 
-4. Position your hand in the guide box and make ASL signs
+## Project Structure
 
-5. The detected sign will appear on screen
+```
+sign-language-translator/
+├── app.py              # Flask application
+├── model/             # Model directory
+│   ├── asl_model.h5   # Trained model
+│   └── class_names.npy # Class labels
+├── static/            # Static files
+│   ├── css/          # Stylesheets
+│   └── js/           # JavaScript files
+├── templates/         # HTML templates
+├── requirements.txt   # Python dependencies
+└── README.md         # Project documentation
+```
 
-## Supported Signs
+## Technical Details
 
-Currently supports the following ASL letters:
-- A (closed fist)
-- B (all fingers up)
-- D (index finger up)
-- I (index and pinky up)
-- L (thumb and index finger up)
-- V (index and middle fingers up)
-- W (index, middle, and ring fingers up)
-- Y (thumb and pinky up)
-- 5 (all fingers up)
-
-## Troubleshooting
-
-If you encounter any issues:
-1. Make sure the Flask server is running
-2. Check that your camera is working and accessible
-3. Ensure you're using a modern browser
-4. Look for error messages in the browser console (F12)
-5. Check the Flask server logs for detailed error information
+- Built with Flask for the backend
+- Uses TensorFlow for sign detection
+- OpenCV for image processing
+- Real-time webcam feed processing
+- Responsive web interface
 
 ## Contributing
 
-Feel free to submit issues and enhancement requests!
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- ASL Alphabet dataset from Kaggle
+- TensorFlow and OpenCV communities
+- Flask framework 

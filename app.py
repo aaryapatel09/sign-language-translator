@@ -17,18 +17,60 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app)
 
-# Load the trained model and class names
-model_path = 'model/asl_model.h5'
-class_names_path = 'model/class_names.npy'
+# Load the model and class names
+model_path = os.path.join(os.path.dirname(__file__), 'model', 'asl_model.h5')
+class_names_path = os.path.join(os.path.dirname(__file__), 'model', 'class_names.npy')
 
-if not os.path.exists(model_path) or not os.path.exists(class_names_path):
-    logger.warning("Model files not found. Running in test mode.")
-    TEST_MODE = True
-else:
-    TEST_MODE = False
-    model = tf.keras.models.load_model(model_path)
-    class_names = np.load(class_names_path)
-    logger.info(f"Loaded model with {len(class_names)} classes")
+# Initialize variables
+model = None
+class_names = None
+
+def create_model():
+    """Create a new model with the same architecture."""
+    model = tf.keras.Sequential([
+        tf.keras.layers.Input(shape=(64, 64, 3)),
+        tf.keras.layers.Conv2D(32, (3, 3), activation='relu'),
+        tf.keras.layers.MaxPooling2D((2, 2)),
+        tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+        tf.keras.layers.MaxPooling2D((2, 2)),
+        tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+        tf.keras.layers.Flatten(),
+        tf.keras.layers.Dense(64, activation='relu'),
+        tf.keras.layers.Dense(26, activation='softmax')
+    ])
+    return model
+
+try:
+    # Load class names
+    if os.path.exists(class_names_path):
+        class_names = np.load(class_names_path)
+        logger.info(f"Successfully loaded {len(class_names)} class names")
+    else:
+        logger.error(f"Class names file not found at {class_names_path}")
+        
+    # Load the model if it exists
+    if os.path.exists(model_path):
+        try:
+            # Create a new model with the same architecture
+            model = create_model()
+            # Load weights from the saved model
+            model.load_weights(model_path)
+            # Compile the model
+            model.compile(
+                optimizer='adam',
+                loss='sparse_categorical_crossentropy',
+                metrics=['accuracy']
+            )
+            logger.info("Model created and weights loaded successfully")
+        except Exception as model_error:
+            logger.error(f"Error loading model: {str(model_error)}")
+            model = None
+    else:
+        logger.error(f"Model file not found at {model_path}")
+        
+except Exception as e:
+    logger.error(f"Error during initialization: {str(e)}")
+    logger.error(traceback.format_exc())
 
 def preprocess_image(image):
     """Preprocess the image for model input."""
@@ -77,8 +119,9 @@ def process_frame():
 
         logger.info(f"Decoded image shape: {frame.shape}")
         
-        if TEST_MODE:
-            # For testing, return a random sign
+        if model is None or class_names is None:
+            logger.warning("Model not loaded. Running in test mode.")
+            TEST_MODE = True
             detected_sign = get_test_sign()
             logger.info(f"Test mode: Detected sign: {detected_sign}")
             return jsonify({'sign': detected_sign})
