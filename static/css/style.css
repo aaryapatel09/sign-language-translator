@@ -18,10 +18,9 @@ body {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    display: block;
 }
 
-.video-overlay {
+.overlay {
     position: absolute;
     top: 0;
     left: 0;
@@ -30,7 +29,6 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    pointer-events: none;
 }
 
 .guide-box {
@@ -59,7 +57,7 @@ body {
 
 #status {
     margin: 0.5rem 0 0 0;
-    font-size: 0.9rem;
+    font-size: 1rem;
 }
 
 .card {
@@ -76,21 +74,6 @@ body {
 
 .alert ol {
     margin-bottom: 0;
-}
-
-#debug-info {
-    text-align: left;
-    margin-top: 2rem;
-}
-
-#debug-log {
-    background-color: #f8f9fa;
-    padding: 1rem;
-    border-radius: 8px;
-    font-size: 0.8rem;
-    max-height: 200px;
-    overflow-y: auto;
-    margin: 0;
 }
 
 .controls {
