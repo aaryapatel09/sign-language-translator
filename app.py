@@ -73,19 +73,27 @@ except Exception as e:
     logger.error(traceback.format_exc())
 
 def preprocess_image(image):
-    """Preprocess the image for model input."""
-    # Resize to 64x64
-    image = cv2.resize(image, (64, 64))
-    # Convert to RGB if needed
-    if len(image.shape) == 2:
-        image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
-    elif image.shape[2] == 4:
-        image = cv2.cvtColor(image, cv2.COLOR_BGRA2RGB)
-    # Normalize
-    image = image / 255.0
-    # Add batch dimension
-    image = np.expand_dims(image, axis=0)
-    return image
+    """Preprocess the image for model prediction."""
+    try:
+        # Resize image to 64x64
+        image = cv2.resize(image, (64, 64))
+        
+        # Convert to RGB if grayscale
+        if len(image.shape) == 2:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
+        elif image.shape[2] == 4:
+            image = cv2.cvtColor(image, cv2.COLOR_RGBA2RGB)
+            
+        # Normalize pixel values
+        image = image.astype('float32') / 255.0
+        
+        # Add batch dimension
+        image = np.expand_dims(image, axis=0)
+        
+        return image
+    except Exception as e:
+        logger.error(f"Error preprocessing image: {str(e)}")
+        return None
 
 def get_test_sign():
     """Return a random sign for testing."""
@@ -100,48 +108,37 @@ def index():
 
 @app.route('/process_frame', methods=['POST'])
 def process_frame():
-    if 'image' not in request.files:
-        logger.error("No image provided in request")
-        return jsonify({'error': 'No image provided'}), 400
+    if model is None or class_names is None:
+        return jsonify({'error': 'Model not loaded properly'}), 500
 
     try:
-        # Read the image from the request
+        # Get the image from the request
         file = request.files['image']
-        image_bytes = file.read()
-        logger.info(f"Received image of size: {len(image_bytes)} bytes")
+        # Read the image
+        image = cv2.imdecode(np.frombuffer(file.read(), np.uint8), cv2.IMREAD_COLOR)
         
-        nparr = np.frombuffer(image_bytes, np.uint8)
-        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-        if frame is None:
-            logger.error("Failed to decode image")
-            return jsonify({'error': 'Failed to decode image'}), 400
-
-        logger.info(f"Decoded image shape: {frame.shape}")
+        # Preprocess the image
+        processed_image = preprocess_image(image)
+        if processed_image is None:
+            return jsonify({'error': 'Failed to preprocess image'}), 500
         
-        if model is None or class_names is None:
-            logger.warning("Model not loaded. Running in test mode.")
-            TEST_MODE = True
-            detected_sign = get_test_sign()
-            logger.info(f"Test mode: Detected sign: {detected_sign}")
-            return jsonify({'sign': detected_sign})
+        # Make prediction
+        predictions = model.predict(processed_image)
+        predicted_class_idx = np.argmax(predictions[0])
+        confidence = float(np.max(predictions[0]))
+        
+        # Only return prediction if confidence is above threshold
+        if confidence > 0.5:  # 50% confidence threshold
+            predicted_sign = class_names[predicted_class_idx]
+            logger.info(f"Detected sign: {predicted_sign} with confidence: {confidence:.2f}")
+            return jsonify({
+                'sign': predicted_sign,
+                'confidence': confidence
+            })
         else:
-            # Preprocess the image
-            processed_image = preprocess_image(frame)
+            logger.info(f"Low confidence prediction: {confidence:.2f}")
+            return jsonify({'sign': '-'})
             
-            # Make prediction
-            predictions = model.predict(processed_image)
-            predicted_class = np.argmax(predictions[0])
-            confidence = float(predictions[0][predicted_class])
-            
-            if confidence > 0.7:  # Confidence threshold
-                detected_sign = class_names[predicted_class]
-                logger.info(f"Detected sign: {detected_sign} with confidence: {confidence:.2f}")
-                return jsonify({'sign': detected_sign})
-            else:
-                logger.info(f"No confident sign detected. Best match: {class_names[predicted_class]} with confidence: {confidence:.2f}")
-                return jsonify({'sign': '-'})
-
     except Exception as e:
         logger.error(f"Error processing frame: {str(e)}")
         logger.error(traceback.format_exc())

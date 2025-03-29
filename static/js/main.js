@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let stream = null;
     let canvas = document.createElement('canvas');
     let context = canvas.getContext('2d');
+    let isProcessing = false;
 
     // Set canvas size
     canvas.width = 640;
@@ -20,7 +21,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             video.srcObject = stream;
-            video.play();
+            await video.play();
+            isProcessing = true;
             processFrame();
         } catch (err) {
             console.error('Error accessing camera:', err);
@@ -30,7 +32,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Process frame and send to server
     async function processFrame() {
-        if (!video.videoWidth) return;
+        if (!isProcessing || !video.videoWidth) return;
 
         // Draw video frame to canvas
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -56,9 +58,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
 
-                result.textContent = data.sign;
+                // Update result with confidence if available
+                if (data.confidence) {
+                    const confidence = Math.round(data.confidence * 100);
+                    result.textContent = `${data.sign} (${confidence}%)`;
+                } else {
+                    result.textContent = data.sign;
+                }
+
+                // Add visual feedback based on confidence
+                if (data.confidence && data.confidence > 0.5) {
+                    result.style.color = '#198754'; // Green for high confidence
+                } else {
+                    result.style.color = '#6c757d'; // Gray for low confidence
+                }
             } catch (err) {
                 console.error('Error processing frame:', err);
+                result.textContent = 'Error';
+                result.style.color = '#dc3545'; // Red for errors
             }
 
             // Process next frame
@@ -68,6 +85,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Clean up when page is unloaded
     window.addEventListener('beforeunload', () => {
+        isProcessing = false;
         if (stream) {
             stream.getTracks().forEach(track => track.stop());
         }
