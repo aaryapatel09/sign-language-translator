@@ -1,0 +1,4 @@
+# This is a placeholder file. The actual class names will be created when you train the model.
+# To train the model:
+# 1. Download the ASL dataset from Kaggle
+# 2. Run python train_model.py 
