@@ -35,6 +35,13 @@ let lastLetter = null;
 let letterStart = 0;
 let lastAppended = null;
 
+// Temporal smoother. The raw classifier runs per frame (~30 fps) and a brief
+// mis-read can flicker between poses during transitions. Keep the last N raw
+// predictions and report the majority vote — this steadies the displayed letter
+// and stops transient noise from triggering auto-append.
+const SMOOTH_WINDOW = 7;
+const recent = [];
+
 function setStatus(t) { statusEl.textContent = t; }
 
 async function initLandmarker() {
@@ -92,6 +99,9 @@ function stop() {
   stopBtn.disabled = true;
   setStatus("Stopped");
   setLetter("—", 0);
+  recent.length = 0;
+  lastLetter = null;
+  lastAppended = null;
 }
 
 function loop() {
@@ -116,13 +126,15 @@ function drawFrame(res) {
 
 function handleResult(res, t) {
   if (!res.landmarks || res.landmarks.length === 0) {
-    setLetter("—", 0);
+    pushSample({ letter: "—", confidence: 0 });
     lastLetter = null;
+    setLetter("—", 0);
     return;
   }
   const hand = res.landmarks[0];
   const handedness = res.handedness?.[0]?.[0]?.categoryName ?? "Right";
-  const { letter, confidence } = classify(hand, handedness);
+  pushSample(classify(hand, handedness));
+  const { letter, confidence } = smoothed();
   setLetter(letter, confidence);
 
   if (!autoEl.checked) return;
@@ -138,6 +150,26 @@ function handleResult(res, t) {
     append(letter);
     lastAppended = letter;
   }
+}
+
+function pushSample(s) {
+  recent.push(s);
+  if (recent.length > SMOOTH_WINDOW) recent.shift();
+}
+
+function smoothed() {
+  if (recent.length === 0) return { letter: "—", confidence: 0 };
+  // Pick the letter that appears most often in the window; confidence is the
+  // mean confidence of samples agreeing with the winner.
+  const counts = new Map();
+  for (const s of recent) counts.set(s.letter, (counts.get(s.letter) || 0) + 1);
+  let best = "—", bestN = 0;
+  for (const [k, n] of counts) if (n > bestN) { best = k; bestN = n; }
+  const agree = recent.filter((s) => s.letter === best);
+  const conf = agree.reduce((a, s) => a + s.confidence, 0) / agree.length;
+  // Require a clear majority — otherwise the user is mid-transition.
+  if (bestN * 2 <= recent.length) return { letter: "?", confidence: 0.3 };
+  return { letter: best, confidence: conf };
 }
 
 function setLetter(l, c) {
@@ -170,13 +202,22 @@ function dist(a, b) {
 }
 
 function fingerExtended(lm, tip, pip, mcp) {
-  // Finger is "extended" if the tip is farther from the wrist than the pip joint
-  // AND the tip sits above (smaller y) the mcp for upright hands. Combining both
-  // keeps the rule robust to partial rotation.
+  // Finger is "extended" when:
+  //   1. tip is farther from the wrist than pip (basic length gate), and
+  //   2. the segments (mcp→pip) and (pip→tip) point in the same direction,
+  //      i.e. the finger is roughly straight rather than curled back.
+  // Using a dot product instead of a raw y comparison is robust to a rotated
+  // or tilted hand — the previous y<mcp.y rule failed whenever the user held
+  // the hand sideways.
   const w = lm[0];
-  const d = dist(lm[tip], w) > dist(lm[pip], w) * 1.03;
-  const up = lm[tip].y < lm[mcp].y;
-  return d && up;
+  const farEnough = dist(lm[tip], w) > dist(lm[pip], w) * 1.03;
+  const v1x = lm[pip].x - lm[mcp].x, v1y = lm[pip].y - lm[mcp].y;
+  const v2x = lm[tip].x - lm[pip].x, v2y = lm[tip].y - lm[pip].y;
+  const len1 = Math.hypot(v1x, v1y) + 1e-6;
+  const len2 = Math.hypot(v2x, v2y) + 1e-6;
+  const cosine = (v1x * v2x + v1y * v2y) / (len1 * len2);
+  // cos > 0.3 ≈ segments within ~70° of each other; tuned empirically.
+  return farEnough && cosine > 0.3;
 }
 
 function thumbExtended(lm, handedness) {
