@@ -178,7 +178,7 @@ function setLetter(l, c) {
   confText.textContent = l === "—" || l === "?" ? "" : `confidence ${(c * 100).toFixed(0)}%`;
 }
 
-function append(s) { bufferEl.textContent += s; }
+function append(s) { bufferEl.textContent += s; renderSuggestions(); }
 
 speakBtn.addEventListener("click", () => {
   const text = bufferEl.textContent.trim();
@@ -187,8 +187,87 @@ speakBtn.addEventListener("click", () => {
   window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
 });
 spaceBtn.addEventListener("click", () => append(" "));
-backBtn.addEventListener("click", () => (bufferEl.textContent = bufferEl.textContent.slice(0, -1)));
-clearBtn.addEventListener("click", () => (bufferEl.textContent = ""));
+backBtn.addEventListener("click", () => { bufferEl.textContent = bufferEl.textContent.slice(0, -1); renderSuggestions(); });
+clearBtn.addEventListener("click", () => { bufferEl.textContent = ""; renderSuggestions(); });
+
+// ————— word suggestions —————
+// Load a ~5k-word frequency-sorted dictionary once; fingerspelling one letter
+// at a time is slow, so showing completion chips for the current prefix makes
+// the app actually usable for more than isolated-letter demos.
+const suggestionsEl = document.getElementById("suggestions");
+let dictionary = [];
+
+(async () => {
+  try {
+    const r = await fetch("data/words.json");
+    dictionary = await r.json();
+    renderSuggestions();
+  } catch {
+    suggestionsEl.innerHTML = "";
+  }
+})();
+
+// Number keys 1–5 pick the corresponding suggestion without leaving the page.
+window.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.target.isContentEditable) return;
+  const n = Number(e.key);
+  if (!Number.isInteger(n) || n < 1 || n > 5) return;
+  const chips = suggestionsEl.querySelectorAll(".suggestion");
+  if (chips[n - 1]) chips[n - 1].click();
+});
+
+function currentPrefix() {
+  const text = bufferEl.textContent;
+  const tail = text.split(/\s+/).pop() || "";
+  return tail.toLowerCase();
+}
+
+function suggest(prefix, limit = 5) {
+  if (!prefix || dictionary.length === 0) return [];
+  const out = [];
+  for (const w of dictionary) {
+    if (w.startsWith(prefix)) {
+      out.push(w);
+      if (out.length >= limit) break;
+    }
+  }
+  return out;
+}
+
+function renderSuggestions() {
+  if (!suggestionsEl) return;
+  const prefix = currentPrefix();
+  if (!prefix) {
+    suggestionsEl.innerHTML = dictionary.length === 0
+      ? `<span class="suggestion-hint">Loading dictionary…</span>`
+      : `<span class="suggestion-hint">Type a letter to see suggestions. 1–5 to pick.</span>`;
+    return;
+  }
+  const hits = suggest(prefix, 5);
+  if (hits.length === 0) {
+    suggestionsEl.innerHTML = `<span class="suggestion-hint">No matches for "${escapeHtml(prefix)}"</span>`;
+    return;
+  }
+  suggestionsEl.innerHTML = hits
+    .map((w, i) => `<button type="button" class="suggestion" data-word="${escapeHtml(w)}"><span class="idx">${i + 1}</span>${escapeHtml(w)}</button>`)
+    .join("");
+  for (const btn of suggestionsEl.querySelectorAll(".suggestion")) {
+    btn.addEventListener("click", () => acceptSuggestion(btn.dataset.word));
+  }
+}
+
+function acceptSuggestion(word) {
+  // Replace the trailing partial word with the completed one + a space,
+  // so the user can immediately start the next word.
+  const text = bufferEl.textContent;
+  const idx = text.search(/\S+$/);
+  bufferEl.textContent = (idx < 0 ? text : text.slice(0, idx)) + word + " ";
+  renderSuggestions();
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
 startBtn.addEventListener("click", start);
 stopBtn.addEventListener("click", stop);
 

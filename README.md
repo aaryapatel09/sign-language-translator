@@ -17,6 +17,8 @@ python3 -m http.server 8000
 
 Click **Start camera**, allow webcam access, and sign. The detected letter auto-appends to the buffer when held for one second.
 
+As letters accumulate, the current-word prefix triggers up to five completions from a bundled ~4,800-word frequency list. Tap a chip or press **1–5** to accept — the partial word is replaced with the completion plus a space, so you can start the next word immediately.
+
 ## Supported letters
 
 **A · B · C · D · E · F · I · L · O · U · V · W · Y** — 13 static letters — plus an open-palm **Hello** sign.
