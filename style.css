@@ -44,6 +44,12 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .controls { display: flex; gap: 8px; }
 .controls button { flex: 1; }
 
+.suggestions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; min-height: 26px; }
+.suggestion { background: #0e1016; color: var(--fg); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 12px; font-family: ui-monospace, Menlo, monospace; cursor: pointer; transition: background .15s; }
+.suggestion:hover { background: #1f2430; border-color: var(--accent); }
+.suggestion .idx { color: var(--accent); font-weight: 700; margin-right: 4px; }
+.suggestion-hint { color: var(--muted); font-size: 11px; padding: 4px 0; }
+
 .legend { margin-top: 24px; color: var(--muted); font-size: 13px; }
 .legend details { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; }
 .legend summary { cursor: pointer; color: var(--fg); }
